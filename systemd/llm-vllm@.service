@@ -1,0 +1,28 @@
+[Unit]
+Description=Local LLM inference (%i) using vLLM XPU
+After=local-fs.target
+
+[Service]
+Type=simple
+User=wendaoji
+Group=wendaoji
+WorkingDirectory=/data/llm/a3950x-run-llm
+ExecStartPre=/usr/bin/mkdir -p /data/llm/logs /data/llm/locks
+ExecStart=/data/llm/a3950x-run-llm/scripts/serve-model.sh %i
+Restart=no
+TimeoutStopSec=120
+KillSignal=SIGTERM
+MemoryHigh=28G
+MemoryMax=32G
+MemorySwapMax=0
+UMask=0077
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/data/llm/cache /data/llm/logs /data/llm/locks
+PrivateTmp=true
+StandardOutput=append:/data/llm/logs/vllm-%i.log
+StandardError=inherit
+
+[Install]
+WantedBy=multi-user.target

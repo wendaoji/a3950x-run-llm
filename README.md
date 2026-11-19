@@ -4,15 +4,15 @@
 
 ## 目录约定
 
-- `scripts/`：可复用的模型服务管理与诊断脚本。
+- `scripts/`：通用模型服务入口、systemd 安装脚本。
 - `docs/`：架构、模型选择、性能测试与运维说明。
 - `docs/runbooks/`：按具体操作编写的运行手册。
-- `config/`：可提交的非敏感配置模板；服务器专属配置不提交。
+- `config/models/`：每个模型独立的非敏感启动参数。
 - `examples/`：命令和配置示例。
 
 ## 约束
 
-- 当前主模型选择为 Qwen3.6-27B；其他模型作为辅助模型另行评估。
+- 当前主模型选择为 Qwen3.6-27B；另有 35B 候选、Embedding、Reranker 和 4B 多模态 profile。
 - 默认模型目录为 `/data/llm/models`，运行环境与缓存放在 `/data/llm` 下。
 - 运行脚本应使用明确的模型路径和版本，不自动下载、升级依赖或启动压力测试。
 - 不提交模型权重、密钥、令牌、机器专属配置、缓存和运行日志。
@@ -20,4 +20,4 @@
 
 ## 使用
 
-具体服务命令和参数以 `docs/runbooks/` 中经验证的说明为准。新增脚本时请提供 `--help`，并确保默认执行不会触发模型下载或压力测试。
+列出启动配置：`scripts/serve-model.sh --list`。部署和调参方法见 [`docs/runbooks/model-profiles.md`](docs/runbooks/model-profiles.md)。启动器只加载本地模型，不自动下载或压力测试。27B/35B 的模型元数据标记 AutoRound，但服务器既有测试通过显式 `--quantization inc` 与 oneDNN W4A16 后端成功加载；启动器按该已测覆盖配置运行。

@@ -23,6 +23,8 @@ reports/
 *.log
 *.env
 !.env.example
+!config/models/
+!config/models/*.env
 
 # Editor / OS
 .DS_Store
