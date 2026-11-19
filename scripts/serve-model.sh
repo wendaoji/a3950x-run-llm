@@ -7,10 +7,12 @@ CONFIG_DIR="${MODEL_CONFIG_DIR:-${REPO_ROOT}/config/models}"
 LLM_ROOT="${LLM_ROOT:-/data/llm}"
 VLLM_ENV="${VLLM_ENV:-${LLM_ROOT}/envs/vllm-xpu-0.33.0}"
 LOCK_FILE="${LOCK_FILE:-${LLM_ROOT}/locks/vllm-xpu.lock}"
+LOG_DIR="${LOG_DIR:-${LLM_ROOT}/logs/models}"
 
 usage() {
   cat <<'EOF'
 Usage: serve-model.sh <profile>
+       serve-model.sh --check <profile>
        serve-model.sh --list
        serve-model.sh --help
 
@@ -20,6 +22,8 @@ EOF
 }
 
 if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then usage; exit 0; fi
+CHECK_ONLY=0
+if [[ "${1:-}" == "--check" ]]; then CHECK_ONLY=1; shift; fi
 if [[ "${1:-}" == "--list" ]]; then
   for profile_file in "${CONFIG_DIR}"/*.env; do
     [[ -f "${profile_file}" ]] || continue
@@ -58,6 +62,12 @@ EXPECTED_VLLM_VERSION="${EXPECTED_VLLM_VERSION:-0.33.0}"
 
 fail() { printf 'ERROR [%s]: %s\n' "${PROFILE}" "$*" >&2; exit 1; }
 
+if [[ "${CHECK_ONLY}" == 0 ]]; then
+  mkdir -p "${LOG_DIR}"
+  [[ -w "${LOG_DIR}" ]] || fail "log directory is not writable: ${LOG_DIR}"
+  exec >>"${LOG_DIR}/vllm-${PROFILE}.log" 2>&1
+fi
+
 [[ -n "${MODEL_PATH}" && -d "${MODEL_PATH}" ]] || fail "model directory missing: ${MODEL_PATH:-<unset>}"
 [[ -x "${VLLM_ENV}/bin/vllm" && -x "${VLLM_ENV}/bin/python" ]] || fail "vLLM environment missing under ${VLLM_ENV}"
 [[ -x /usr/bin/flock ]] || fail "util-linux flock is required at /usr/bin/flock"
@@ -80,6 +90,7 @@ required_kib="$((MIN_AVAILABLE_GIB * 1024 * 1024))"
 
 "${VLLM_ENV}/bin/python" - "${MODEL_PATH}" "${EXPECTED_VLLM_VERSION}" "${QUANTIZATION}" <<'PY'
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -101,7 +112,7 @@ if not torch.xpu.is_available():
     raise SystemExit(1)
 names = [torch.xpu.get_device_name(i) for i in range(torch.xpu.device_count())]
 print(f"vLLM {vllm.__version__}; XPU devices: {'; '.join(names)}")
-if not any("Arc Pro B60" in name for name in names):
+if not any(re.search(r"Arc(?:\(TM\))?\s+Pro\s+B60", name, re.IGNORECASE) for name in names):
     print("ERROR: Intel Arc Pro B60 was not found among XPU devices", file=sys.stderr)
     raise SystemExit(1)
 
@@ -127,10 +138,6 @@ if config_path.is_file():
         if quantization_override and quant_method and quantization_override != quant_method:
             print(f"Quantization override: checkpoint={quant_method}; runtime={quantization_override}")
 
-incomplete = list(root.rglob("*.incomplete"))
-if incomplete:
-    print(f"ERROR: model download has {len(incomplete)} incomplete file(s); first: {incomplete[0]}", file=sys.stderr)
-    raise SystemExit(1)
 weights = list(root.rglob("*.safetensors")) + list(root.rglob("pytorch_model*.bin"))
 if not weights:
     print("ERROR: no complete model weight files found", file=sys.stderr)
@@ -147,8 +154,17 @@ for index_name in ("model.safetensors.index.json", "pytorch_model.bin.index.json
         if missing:
             print(f"ERROR: model shard(s) missing: {', '.join(missing[:5])}", file=sys.stderr)
             raise SystemExit(1)
+has_weight_index = any((root / index_name).is_file() for index_name in ("model.safetensors.index.json", "pytorch_model.bin.index.json"))
+if not has_weight_index and any("-of-" in path.name for path in weights):
+    print("ERROR: sharded model weights are present but the safetensors index is missing", file=sys.stderr)
+    raise SystemExit(1)
 print(f"Model files present: {len(weights)} weight file(s)")
 PY
+
+if [[ "${CHECK_ONLY}" == 1 ]]; then
+  echo "Profile ${PROFILE} preflight passed; model was not started."
+  exit 0
+fi
 
 export HF_HOME="${HF_HOME:-${LLM_ROOT}/cache/huggingface}"
 export HF_HUB_OFFLINE="${HF_HUB_OFFLINE:-1}"

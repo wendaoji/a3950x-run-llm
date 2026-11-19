@@ -21,8 +21,8 @@ ProtectSystem=strict
 ProtectHome=read-only
 ReadWritePaths=/data/llm/cache /data/llm/logs /data/llm/locks
 PrivateTmp=true
-StandardOutput=append:/data/llm/logs/vllm-%i.log
-StandardError=inherit
+StandardOutput=journal
+StandardError=journal
 
 [Install]
 WantedBy=multi-user.target

@@ -1,6 +1,6 @@
 # 模型启动配置与调参
 
-仓库使用一个通用入口 `scripts/serve-model.sh` 和 `config/models/*.env` 模型配置。模型服务由 systemd template unit `llm-vllm@.service` 管理。启动脚本默认离线加载本地文件；下载未完成、vLLM 版本不符、B60 XPU 不可见或可用内存不足时会拒绝启动。
+仓库使用一个通用入口 `scripts/serve-model.sh` 和 `config/models/*.env` 模型配置。模型服务由 systemd template unit `llm-vllm@.service` 管理。启动脚本默认离线加载本地文件；下载权重缺失、vLLM 版本不符、B60 XPU 不可见或可用内存不足时会拒绝启动。B60 设备检查接受 `Arc(TM) Pro B60` 形式的真实设备名。
 
 ## 配置一览
 
@@ -25,7 +25,7 @@ GPU 显存规划比例是 vLLM 运行时的设备内存预算参数，不是系�
 
 ## 先检查模型是否完整
 
-最近只读盘点时，Embedding、Reranker、Qwen3.5-4B 的 Hugging Face 后台下载仍在运行，目录中仍有 `.incomplete` 权重分片。启动器检测到任何 `.incomplete` 文件或缺少分片时会退出。下载结束后检查：
+最近只读盘点时，Embedding、Reranker、Qwen3.5-4B 的 Hugging Face 后台下载仍在运行，目录中仍有未完成分片。启动器会检查权重索引及其引用的所有文件，未找到完整权重或缺少必需分片时会退出；不会因 Hugging Face 缓存中遗留的无关 `.incomplete` 临时文件而误拦截。下载结束后检查：
 
 ```bash
 systemctl --user status llm-aux-models-download.service --no-pager
@@ -54,9 +54,10 @@ systemctl cat 'llm-vllm@.service'
 
 ```bash
 /data/llm/a3950x-run-llm/scripts/serve-model.sh --list
+/data/llm/a3950x-run-llm/scripts/serve-model.sh --check qwen36-27b
 sudo systemctl start llm-vllm@qwen36-27b.service
 systemctl status llm-vllm@qwen36-27b.service --no-pager
-tail -n 100 /data/llm/logs/vllm-qwen36-27b.log
+tail -n 100 /data/llm/logs/models/vllm-qwen36-27b.log
 curl --fail http://127.0.0.1:8000/v1/models
 ```
 
@@ -67,7 +68,7 @@ sudo systemctl stop llm-vllm@qwen36-27b.service
 sudo systemctl start llm-vllm@qwen3-embedding-0.6b.service
 ```
 
-停止服务会释放模型占用：
+`--check` 只检查配置、可用内存、XPU、vLLM 版本和权重索引，不启动模型。程序输出保存在服务用户可读的 `/data/llm/logs/models/vllm-<profile>.log`，systemd 生命周期信息可用 `journalctl -u <unit> -n 100 --no-pager` 查看。停止服务会释放模型占用：
 
 ```bash
 sudo systemctl stop llm-vllm@qwen3-embedding-0.6b.service
