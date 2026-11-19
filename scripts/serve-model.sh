@@ -172,6 +172,10 @@ export TRANSFORMERS_OFFLINE="${TRANSFORMERS_OFFLINE:-1}"
 export HF_HUB_DISABLE_TELEMETRY=1
 export ZE_AFFINITY_MASK="${ZE_AFFINITY_MASK:-0}"
 export VLLM_WORKER_MULTIPROC_METHOD="${VLLM_WORKER_MULTIPROC_METHOD:-spawn}"
+# oneCCL loads its OpenMP transport plugin dynamically. That plugin depends on
+# libraries shipped in the vLLM environment root, which systemd does not add
+# to the loader path automatically.
+export LD_LIBRARY_PATH="${VLLM_ENV}/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
 if [[ -n "${VLLM_XPU_INC_WNA16_BACKEND:-}" ]]; then
   export VLLM_XPU_INC_WNA16_BACKEND
 fi
