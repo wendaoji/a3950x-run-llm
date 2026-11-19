@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+*.secret
+secrets/
+
+# Model weights, caches, logs, and generated benchmark output
+models/
+cache/
+logs/
+reports/
+*.safetensors
+*.gguf
+*.pt
+*.bin
+*.log
+*.env
+!.env.example
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/

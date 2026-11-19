@@ -1,0 +1,32 @@
+[Unit]
+Description=Local Qwen3.6-27B inference service (vLLM XPU)
+After=local-fs.target
+ConditionPathIsDirectory=/data/llm/models/Qwen3.6-27B-int4-AutoRound
+
+[Service]
+Type=simple
+User=wendaoji
+Group=wendaoji
+WorkingDirectory=/data/llm
+EnvironmentFile=-/data/llm/config/serve-qwen.env
+Environment=HF_HUB_OFFLINE=1
+Environment=TRANSFORMERS_OFFLINE=1
+Environment=HF_HUB_DISABLE_TELEMETRY=1
+ExecStartPre=/usr/bin/mkdir -p /data/llm/logs
+ExecStart=/data/llm/scripts/serve-qwen.sh
+Restart=no
+TimeoutStopSec=120
+KillSignal=SIGTERM
+MemoryHigh=36G
+MemoryMax=40G
+UMask=0077
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/data/llm/cache /data/llm/logs
+PrivateTmp=true
+StandardOutput=append:/data/llm/logs/qwen3.6-27b-vllm.log
+StandardError=inherit
+
+[Install]
+WantedBy=multi-user.target
