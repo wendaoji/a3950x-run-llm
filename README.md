@@ -21,3 +21,5 @@
 ## 使用
 
 列出启动配置：`scripts/serve-model.sh --list`。部署和调参方法见 [`docs/runbooks/model-profiles.md`](docs/runbooks/model-profiles.md)。启动器只加载本地模型，不自动下载或压力测试。27B/35B 的模型元数据标记 AutoRound，但服务器既有测试通过显式 `--quantization inc` 与 oneDNN W4A16 后端成功加载；启动器按该已测覆盖配置运行。
+
+Qwen 服务监听地址、API key 文件和客户端调用方法见 [`docs/runbooks/api-access.md`](docs/runbooks/api-access.md)。密钥只保存在服务器 `/data/llm/secrets/vllm-api-key`，不提交到 Git。

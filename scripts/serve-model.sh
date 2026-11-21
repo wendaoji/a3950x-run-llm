@@ -8,6 +8,7 @@ LLM_ROOT="${LLM_ROOT:-/data/llm}"
 VLLM_ENV="${VLLM_ENV:-${LLM_ROOT}/envs/vllm-xpu-0.33.0}"
 LOCK_FILE="${LOCK_FILE:-${LLM_ROOT}/locks/vllm-xpu.lock}"
 LOG_DIR="${LOG_DIR:-${LLM_ROOT}/logs/models}"
+API_KEY_FILE="${API_KEY_FILE:-${LLM_ROOT}/secrets/vllm-api-key}"
 
 usage() {
   cat <<'EOF'
@@ -83,6 +84,9 @@ fi
 [[ "${LANGUAGE_MODEL_ONLY}" == 0 || "${LANGUAGE_MODEL_ONLY}" == 1 ]] || fail "LANGUAGE_MODEL_ONLY must be 0 or 1"
 [[ "${ENFORCE_EAGER}" == 0 || "${ENFORCE_EAGER}" == 1 ]] || fail "ENFORCE_EAGER must be 0 or 1"
 [[ -z "${CHAT_TEMPLATE}" || -r "${CHAT_TEMPLATE}" ]] || fail "chat template is missing or unreadable: ${CHAT_TEMPLATE}"
+[[ -r "${API_KEY_FILE}" ]] || fail "API key file is missing or unreadable: ${API_KEY_FILE}"
+VLLM_API_KEY="$(<"${API_KEY_FILE}")"
+[[ ${#VLLM_API_KEY} -ge 32 ]] || fail "API key must contain at least 32 characters"
 
 available_kib="$(awk '/^MemAvailable:/ {print $2}' /proc/meminfo)"
 required_kib="$((MIN_AVAILABLE_GIB * 1024 * 1024))"
@@ -170,6 +174,8 @@ export HF_HOME="${HF_HOME:-${LLM_ROOT}/cache/huggingface}"
 export HF_HUB_OFFLINE="${HF_HUB_OFFLINE:-1}"
 export TRANSFORMERS_OFFLINE="${TRANSFORMERS_OFFLINE:-1}"
 export HF_HUB_DISABLE_TELEMETRY=1
+export VLLM_API_KEY
+export PYTHONPATH="${SCRIPT_DIR}${PYTHONPATH:+:${PYTHONPATH}}"
 export ZE_AFFINITY_MASK="${ZE_AFFINITY_MASK:-0}"
 export VLLM_WORKER_MULTIPROC_METHOD="${VLLM_WORKER_MULTIPROC_METHOD:-spawn}"
 # oneCCL loads its OpenMP transport plugin dynamically. That plugin depends on
@@ -185,6 +191,7 @@ export TRITON_CACHE_DIR="${TRITON_CACHE_DIR:-${LLM_ROOT}/cache/triton}"
 
 mkdir -p "$(dirname -- "${LOCK_FILE}")"
 args=(serve "${MODEL_PATH}"
+  --middleware api_key_auth.RequireApiKey
   --served-model-name "${SERVED_MODEL_NAME}"
   --host "${HOST}"
   --port "${PORT}"
