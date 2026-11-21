@@ -59,6 +59,8 @@ HF_OVERRIDES_JSON="${HF_OVERRIDES_JSON:-}"
 CHAT_TEMPLATE="${CHAT_TEMPLATE:-}"
 LANGUAGE_MODEL_ONLY="${LANGUAGE_MODEL_ONLY:-0}"
 ENFORCE_EAGER="${ENFORCE_EAGER:-0}"
+ENABLE_AUTO_TOOL_CHOICE="${ENABLE_AUTO_TOOL_CHOICE:-0}"
+TOOL_CALL_PARSER="${TOOL_CALL_PARSER:-}"
 EXPECTED_VLLM_VERSION="${EXPECTED_VLLM_VERSION:-0.33.0}"
 
 fail() { printf 'ERROR [%s]: %s\n' "${PROFILE}" "$*" >&2; exit 1; }
@@ -83,6 +85,10 @@ fi
 [[ "${GPU_MEMORY_UTILIZATION}" =~ ^(0(\.[0-9]+)?|1(\.0+)?)$ ]] || fail "GPU_MEMORY_UTILIZATION must be between 0 and 1"
 [[ "${LANGUAGE_MODEL_ONLY}" == 0 || "${LANGUAGE_MODEL_ONLY}" == 1 ]] || fail "LANGUAGE_MODEL_ONLY must be 0 or 1"
 [[ "${ENFORCE_EAGER}" == 0 || "${ENFORCE_EAGER}" == 1 ]] || fail "ENFORCE_EAGER must be 0 or 1"
+[[ "${ENABLE_AUTO_TOOL_CHOICE}" == 0 || "${ENABLE_AUTO_TOOL_CHOICE}" == 1 ]] || fail "ENABLE_AUTO_TOOL_CHOICE must be 0 or 1"
+if [[ "${ENABLE_AUTO_TOOL_CHOICE}" == 1 && -z "${TOOL_CALL_PARSER}" ]]; then
+  fail "TOOL_CALL_PARSER is required when ENABLE_AUTO_TOOL_CHOICE=1"
+fi
 [[ -z "${CHAT_TEMPLATE}" || -r "${CHAT_TEMPLATE}" ]] || fail "chat template is missing or unreadable: ${CHAT_TEMPLATE}"
 [[ -r "${API_KEY_FILE}" ]] || fail "API key file is missing or unreadable: ${API_KEY_FILE}"
 VLLM_API_KEY="$(<"${API_KEY_FILE}")"
@@ -209,6 +215,9 @@ args=(serve "${MODEL_PATH}"
 [[ -z "${CHAT_TEMPLATE}" ]] || args+=(--chat-template "${CHAT_TEMPLATE}")
 if [[ "${LANGUAGE_MODEL_ONLY}" == 1 ]]; then args+=(--language-model-only); fi
 if [[ "${ENFORCE_EAGER}" == 1 ]]; then args+=(--enforce-eager); fi
+if [[ "${ENABLE_AUTO_TOOL_CHOICE}" == 1 ]]; then
+  args+=(--enable-auto-tool-choice --tool-call-parser "${TOOL_CALL_PARSER}")
+fi
 
 printf 'Starting profile=%s model=%s port=%s max_len=%s max_num_seqs=%s gpu_mem_util=%s\n' \
   "${PROFILE}" "${MODEL_ID}" "${PORT}" "${MAX_MODEL_LEN}" "${MAX_NUM_SEQS}" "${GPU_MEMORY_UTILIZATION}"
